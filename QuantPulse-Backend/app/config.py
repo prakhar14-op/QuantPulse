@@ -2,7 +2,7 @@
 QuantPulse Backend Configuration
 
 Production-grade configuration with multi-provider stock data support.
-Safely handles both local development and production deployment environments.
+Safely handles both local development and Railway cloud deployment.
 """
 
 import os
@@ -12,11 +12,12 @@ import logging
 # Environment Detection and Configuration Loading
 # =============================================================================
 
-# Detect environment (development/production)
+# Detect environment (Railway sets RAILWAY_ENVIRONMENT)
 ENV = os.getenv("ENV", "development")
+IS_RAILWAY = os.getenv("RAILWAY_ENVIRONMENT") is not None
 
-# Load .env ONLY for local development
-if ENV == "development":
+# Load .env ONLY for local development (not on Railway)
+if not IS_RAILWAY:
     try:
         from dotenv import load_dotenv
         load_dotenv()
@@ -26,7 +27,7 @@ if ENV == "development":
     except Exception as e:
         print(f"🔧 Running in {ENV} mode - .env loading failed: {e}")
 else:
-    print(f"🚀 Running in {ENV} mode - using system environment variables")
+    print(f"🚀 Running on Railway - using environment variables")
 
 # =============================================================================
 # Application Metadata
@@ -60,7 +61,7 @@ DEMO_MODE = not (TWELVEDATA_API_KEY or FINNHUB_API_KEY)
 # =============================================================================
 
 HOST = "0.0.0.0"
-PORT = int(os.getenv("PORT", 8000))
+PORT = int(os.getenv("PORT", 8000))  # Railway injects PORT dynamically
 
 # CORS Configuration
 ALLOWED_ORIGINS = [
@@ -71,6 +72,7 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
     "http://localhost:8080",
+    # Add Railway domains when deployed
 ]
 
 # =============================================================================
@@ -101,6 +103,7 @@ def setup_logging():
     logger = logging.getLogger(__name__)
     logger.info(f"🔧 Environment: {ENV}")
     logger.info(f"📊 Log Level: {LOG_LEVEL}")
+    logger.info(f"🚀 Railway Deployment: {IS_RAILWAY}")
 
 # =============================================================================
 # Startup Validation and Logging
@@ -118,7 +121,17 @@ def validate_and_log_configuration():
     logger.info(f"🚀 {APP_NAME} v{APP_VERSION}")
     logger.info(f"🔧 Environment: {ENV}")
     logger.info(f"🌐 Server: http://{HOST}:{PORT}")
+    logger.info(f"☁️ Railway: {IS_RAILWAY}")
     logger.info("=" * 60)
+    
+    # STEP 6 — Add Startup Logging (API key availability without printing keys)
+    print("=" * 50)
+    print("API KEY STATUS:")
+    print(f"NEWSAPI_KEY loaded: {bool(NEWSAPI_KEY)}")
+    print(f"FINNHUB_API_KEY loaded: {bool(FINNHUB_API_KEY)}")
+    print(f"TWELVEDATA_API_KEY loaded: {bool(TWELVEDATA_API_KEY)}")
+    print(f"DEMO_MODE: {DEMO_MODE}")
+    print("=" * 50)
     
     # Validate and log API key status
     api_keys_available = []
@@ -151,8 +164,8 @@ def validate_and_log_configuration():
     if DEMO_MODE:
         logger.warning("🔄 No stock API keys detected - running in DEMO MODE")
         logger.warning("🔄 All stock data will be simulated for demonstration")
-        if ENV == "production":
-            logger.error("❌ PRODUCTION deployment without API keys - this is not recommended!")
+        if IS_RAILWAY:
+            logger.error("❌ RAILWAY deployment without API keys - configure them in Railway dashboard!")
     else:
         logger.info("📊 API keys detected - running in LIVE MODE")
         logger.info(f"📊 Available providers: {', '.join(api_keys_available)}")
@@ -164,13 +177,14 @@ def validate_and_log_configuration():
     logger.info(f"💾 Cache configuration: max_size={CACHE_MAX_SIZE}, default_ttl={CACHE_DEFAULT_TTL}s")
     
     # Security reminder for production
-    if ENV == "production" and api_keys_missing:
-        logger.warning("🔐 Security reminder: Ensure API keys are set in production environment")
+    if IS_RAILWAY and api_keys_missing:
+        logger.warning("🔐 Security reminder: Set API keys in Railway dashboard for production")
     
     logger.info("=" * 60)
     
     return {
         "environment": ENV,
+        "is_railway": IS_RAILWAY,
         "demo_mode": DEMO_MODE,
         "api_keys_available": api_keys_available,
         "api_keys_missing": api_keys_missing,
@@ -185,6 +199,7 @@ def validate_and_log_configuration():
 __all__ = [
     # Environment
     "ENV",
+    "IS_RAILWAY",
     "DEMO_MODE",
     
     # Application
@@ -214,9 +229,3 @@ __all__ = [
     "setup_logging",
     "validate_and_log_configuration"
 ]
-
-# Debug: Print loaded values (remove in production)
-if ENV == "development":
-    print(f"DEBUG: TWELVEDATA_API_KEY = {'***' if TWELVEDATA_API_KEY else 'None'}")
-    print(f"DEBUG: FINNHUB_API_KEY = {'***' if FINNHUB_API_KEY else 'None'}")
-    print(f"DEBUG: DEMO_MODE = {DEMO_MODE}")

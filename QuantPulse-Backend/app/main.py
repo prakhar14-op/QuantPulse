@@ -33,6 +33,7 @@ from app.config import (
     APP_DESCRIPTION,
     ALLOWED_ORIGINS,
     DEMO_MODE,
+    IS_RAILWAY,
     setup_logging,
     validate_and_log_configuration
 )
@@ -107,7 +108,10 @@ async def startup_event():
     
     if DEMO_MODE:
         logger.warning("🔄 Running in DEMO MODE - serving simulated data")
-        logger.warning("🔄 To enable live data, configure TWELVEDATA_API_KEY or FINNHUB_API_KEY")
+        if IS_RAILWAY:
+            logger.warning("🔄 Configure API keys in Railway dashboard for live data")
+        else:
+            logger.warning("🔄 To enable live data, configure TWELVEDATA_API_KEY or FINNHUB_API_KEY")
     else:
         logger.info("📊 Running in LIVE MODE - serving real market data")
     
